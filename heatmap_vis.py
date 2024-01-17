@@ -7,15 +7,16 @@ from PIL import Image
 from tqdm import tqdm
 import torch.nn.functional as F
 import extractor_sd as extractor_sd
-from extractor_sd import load_model, process_features_and_mask, get_mask
-from utils.utils_correspondence import co_pca, resize, find_nearest_patchs 
+from extractor_sd import load_model, process_features_and_mask
+from utils.utils_correspondence import co_pca, resize 
 from extractor_dino import ViTExtractor
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-MASK = True
+# Configuration and hyperparameters
+MASK = False
 VER = "v1-5"
 PCA = False
 CO_PCA = True
@@ -36,14 +37,16 @@ DIST = 'l2' if FUSE_DINO and not ONLY_DINO else 'cos'
 if ONLY_DINO:
     FUSE_DINO = True
 
+# Seed initialization for reproducibility
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 torch.cuda.manual_seed(SEED)
 torch.backends.cudnn.benchmark = True
 
+# Load the stable diffusion model
 model, aug = load_model(diffusion_ver=VER, image_size=SIZE, num_timesteps=TIMESTEP)
 
-
+# Function to calculate cosine similarity between feature maps
 def cosine_similarity(features1, features2):
 
     # Flatten the features map
@@ -62,6 +65,7 @@ def cosine_similarity(features1, features2):
 
     return cosine_sim
 
+# Function to compute features for a pair of images
 def compute_pair_feature(model, aug, files, category, mask=False, dist='cos', real_size=960):
     if type(category) == str:
         category = [category]
@@ -150,7 +154,7 @@ def compute_pair_feature(model, aug, files, category, mask=False, dist='cos', re
     return result
 
 
-
+# Path to source and target images
 
 # src_img_path = "/home/paolo/Pictures/basins_collection/Festo_sinks/1681458655276.jpg"
 src_img_path = "data/images/cat0.jpg"
@@ -160,35 +164,39 @@ src_img_path = "data/images/cat0.jpg"
 # trg_img_path = "/home/paolo/Pictures/basins_collection/basin5.jpg"
 trg_img_path = "data/images/dog_00.jpg"
 
-category = "bathroom sink"
+# Category for the images, and pair them
+category = "pets"
 files = [src_img_path, trg_img_path]
+
+# Compute the features for the image pair
 result = compute_pair_feature(model, aug, files, mask=MASK, category=category, dist=DIST)
 
+# Clean up the model from GPU to free memory
 del model
 torch.cuda.empty_cache()
 
+# Reshape the features for visualization
 feature1 = result[0][0]
 feature2 = result[0][1]
-
 src_feature_reshaped = feature1.squeeze().permute(1,0).reshape(1,-1,60,60).cuda()
 tgt_feature_reshaped = feature2.squeeze().permute(1,0).reshape(1,-1,60,60).cuda()
-
+# Upsample the features for higher resolution
 src_feature_upsampled = F.interpolate(src_feature_reshaped, size=(RESOLUTION, RESOLUTION), mode='bilinear')
-print(src_feature_upsampled.shape)
 tgt_feature_upsampled = F.interpolate(tgt_feature_reshaped, size=(RESOLUTION, RESOLUTION), mode='bilinear')
 
+# Compute volume of cosine similarity
 volume = cosine_similarity(src_feature_upsampled,tgt_feature_upsampled)
 
+# Load and process source and target images for visualization
 src_img=Image.open(src_img_path).convert('RGB')
 tgt_img=Image.open(trg_img_path).convert('RGB')
-
 src_img = resize(src_img, RESOLUTION, resize=True, to_pil=False, edge=EDGE_PAD)
 tgt_img = resize(tgt_img, RESOLUTION, resize=True, to_pil=False, edge=EDGE_PAD)
 
+# Extract the similarity tensor
 similarity_tensor = volume.squeeze()
 
-## Make plot for heatmap visualization
-
+# Initialize the plot for heatmap visualization
 fig, (ax1, ax2) = plt.subplots(1, 2)
 
 # Plot the first image in the first subplot
@@ -206,6 +214,7 @@ cbar.set_label('Correlation Value')
 # Initialize a variable to store the previous highlighted pixel position
 prev_highlighted_pixel = None
 
+# Function to handle hover events for interactive visualization
 def on_hover(event):
     global prev_highlighted_pixel
     global src_img
@@ -239,4 +248,5 @@ def on_hover(event):
 # Connect the hover event to the figure
 fig.canvas.mpl_connect('motion_notify_event', on_hover)
 
+# Display the plot
 plt.show()
