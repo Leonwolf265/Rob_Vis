@@ -1,3 +1,23 @@
+Use can now use the script 
+
+```  heatmap_vis.py ```
+
+to have a heatmap visualization of the features' similarities between two images of your choice. 
+Just setup the conda environment, change the ```src_img_path``` and ```trg_img_path``` variables in the script and run it.
+The script uses by default the fused features as they are used in the ```demo_swap.ipynb``` notebook. You can change the global variables defined at the start of the script to test different features described in the paper. Hover with your mouse on the pixels of the image on the left to see the corresponding areas on the image on the right
+
+<div align="center">
+<img src="assets/heatmap_figure_1.png" width="32%">
+<img src="assets/heatmap_figure_2.png" width="32%">
+
+</div>
+
+TODO: make images' paths as arguments together with other settings.
+
+---
+
+Original Readme:
+
 # A Tale of Two Features: Stable Diffusion Complements DINO for Zero-Shot Semantic Correspondence
 
 **A Tale of Two Features** explores the complementary nature of Stable Diffusion (SD) and DINOv2 features for zero-shot semantic correspondence. The results demonstrate that a simple fusion of the two features leads to state-of-the-art performance on the SPair-71k, PF-Pascal, and TSS datasets.
