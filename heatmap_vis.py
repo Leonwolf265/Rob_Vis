@@ -1,12 +1,14 @@
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-import torch
-import os
+import argparse
+
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
+
+import torch
 import torch.nn.functional as F
-import extractor_sd as extractor_sd
+
 from extractor_sd import load_model, process_features_and_mask
 from utils.utils_correspondence import co_pca, resize 
 from extractor_dino import ViTExtractor
@@ -15,7 +17,21 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-# Configuration and hyperparameters
+# Initialize the argument parser
+parser = argparse.ArgumentParser(description='Process the source and target image paths.')
+
+# Define arguments
+parser.add_argument('src_img_path', type=str, help='Path to the source image')
+parser.add_argument('trg_img_path', type=str, help='Path to the target image')
+
+# Parse arguments
+args = parser.parse_args()
+
+# Use the provided arguments
+src_img_path = args.src_img_path
+trg_img_path = args.trg_img_path
+
+# Configuration parameters
 MASK = False
 VER = "v1-5"
 PCA = False
@@ -33,7 +49,7 @@ TEXT_INPUT = False
 SEED = 42
 TIMESTEP = 100 #flexible from 0~200
 
-DIST = 'l2' if FUSE_DINO and not ONLY_DINO else 'cos'
+# DIST = 'l2' if FUSE_DINO and not ONLY_DINO else 'cos'; not needed only using cosine similarity at the moment, no l2 distance
 if ONLY_DINO:
     FUSE_DINO = True
 
@@ -66,7 +82,7 @@ def cosine_similarity(features1, features2):
     return cosine_sim
 
 # Function to compute features for a pair of images
-def compute_pair_feature(model, aug, files, category, mask=False, dist='cos', real_size=960):
+def compute_pair_feature(model, aug, files, category, mask=False, real_size=960):
     if type(category) == str:
         category = [category]
     img_size = 840 if DINOV2 else 244
@@ -131,13 +147,13 @@ def compute_pair_feature(model, aug, files, category, mask=False, dist='cos', re
                     img2_batch = extractor.preprocess_pil(img2)
                     img2_desc_dino = extractor.extract_descriptors(img2_batch.to(device), layer, facet)
                 
-            if dist == 'l1' or dist == 'l2':
-                # normalize the features
-                img1_desc = img1_desc / img1_desc.norm(dim=-1, keepdim=True)
-                img2_desc = img2_desc / img2_desc.norm(dim=-1, keepdim=True)
-                if FUSE_DINO:
-                    img1_desc_dino = img1_desc_dino / img1_desc_dino.norm(dim=-1, keepdim=True)
-                    img2_desc_dino = img2_desc_dino / img2_desc_dino.norm(dim=-1, keepdim=True)
+            # if dist == 'l1' or dist == 'l2':
+            #     # normalize the features
+            #     img1_desc = img1_desc / img1_desc.norm(dim=-1, keepdim=True)
+            #     img2_desc = img2_desc / img2_desc.norm(dim=-1, keepdim=True)
+            #     if FUSE_DINO:
+            #         img1_desc_dino = img1_desc_dino / img1_desc_dino.norm(dim=-1, keepdim=True)
+            #         img2_desc_dino = img2_desc_dino / img2_desc_dino.norm(dim=-1, keepdim=True)
 
             if FUSE_DINO and not ONLY_DINO:
                 # cat two features together
@@ -153,23 +169,12 @@ def compute_pair_feature(model, aug, files, category, mask=False, dist='cos', re
     pbar.update(1)
     return result
 
-
-# Path to source and target images
-
-# src_img_path = "/home/paolo/Pictures/basins_collection/Festo_sinks/1681458655276.jpg"
-src_img_path = "data/images/cat0.jpg"
-
-# Sink images
-# "/home/paolo/Pictures/basins_collection/basin9.jpg"
-# trg_img_path = "/home/paolo/Pictures/basins_collection/basin5.jpg"
-trg_img_path = "data/images/dog_00.jpg"
-
 # Category for the images, and pair them
 category = "pets"
 files = [src_img_path, trg_img_path]
 
 # Compute the features for the image pair
-result = compute_pair_feature(model, aug, files, mask=MASK, category=category, dist=DIST)
+result = compute_pair_feature(model, aug, files, mask=MASK, category=category)
 
 # Clean up the model from GPU to free memory
 del model
