@@ -1,9 +1,9 @@
 Use can now use the script 
 
-```python  heatmap_vis.py /path/to/src/image /path/to/target/image ```
+```python  heatmap_vis.py /path/to/src/image /path/to/target/image similarity_func dinov2_size ```
 
 to have a heatmap visualization of the features' similarities between two images of your choice. 
-Just setup the conda environment, choose a source and a target image by passing their paths as arguments to the script and run it.
+Setup the conda environment; choose a source and a target image, a similarity function ```['cos','l2']```, and the size of the dinov2 model ```['small', 'base']```. \
 The script uses by default the fused features as they are used in the ```demo_swap.ipynb``` notebook. You can change the global variables defined at the start of the script to test different features described in the paper. Hover with your mouse on the pixels of the image on the left to see the corresponding areas on the image on the right.
 
 <div align="center">
@@ -12,7 +12,7 @@ The script uses by default the fused features as they are used in the ```demo_sw
 
 </div>
 
-TODO: make some of the configuration parameters as arguments. add other similarity functions (like l2 norm, currently there is only cosine similarity)
+TODO: make docker image
 
 ---
 

@@ -24,6 +24,12 @@ parser = argparse.ArgumentParser(description='Process the source and target imag
 parser.add_argument('src_img_path', type=str, help='Path to the source image')
 parser.add_argument('trg_img_path', type=str, help='Path to the target image')
 
+# Define an argument for selecting the similarity function
+parser.add_argument('similarity_func', type=str, choices=['l2', 'cos'], help='Similarity function to use: "l2_dist" for L2 distance or "cos" for cosine similarity')
+# Define an argument for selecting the similarity function
+parser.add_argument('dinov2_size', type=str, choices=['small', 'base'], help='Type of dino v2 model to use.')
+
+
 # Parse arguments
 args = parser.parse_args()
 
@@ -44,7 +50,7 @@ EDGE_PAD = False
 FUSE_DINO = 1
 ONLY_DINO = 0
 DINOV2 = True
-MODEL_SIZE = 'base' # 'small' or 'base', indicate dinov2 model
+MODEL_SIZE = args.dinov2_size# # 'small' or 'base', indicate dinov2 model
 TEXT_INPUT = False
 SEED = 42
 TIMESTEP = 100 #flexible from 0~200
@@ -81,8 +87,33 @@ def cosine_similarity(features1, features2):
 
     return cosine_sim
 
+# Function to calculate l2 distance between feature maps
+def l2_distance(features1, features2):
+    # Flatten the feature maps
+    fm1_flat = features1.view(features1.shape[0], features1.shape[1], -1).permute(0, 2, 1)  # [B, H1*W1, C]
+    fm2_flat = features2.view(features2.shape[0], features2.shape[1], -1)  # [B, C, H2*W2]
+
+    # Compute the norms squared
+    fm1_norm2 = torch.sum(fm1_flat ** 2, dim=2, keepdim=True)  # [B, H1*W1, 1]
+    fm2_norm2 = torch.sum(fm2_flat ** 2, dim=1, keepdim=True)  # [B, 1, H2*W2]
+
+    # Compute the dot product
+    dot_product = torch.bmm(fm1_flat, fm2_flat)  # [B, H1*W1, H2*W2]
+
+    # Compute squared L2 distance
+    l2_dist_squared = fm1_norm2 + fm2_norm2.transpose(1, 2) - 2 * dot_product  # [B, H1*W1, H2*W2]
+
+    # Taking the square root gives the L2 distance, ensure non-negative distances
+    l2_dist = torch.sqrt(torch.relu(l2_dist_squared) + 1e-6)
+
+    # Reshape to [batch_size, height1, width1, height2, width2]
+    l2_dist = l2_dist.view(features1.shape[0], features1.shape[2], features1.shape[3], features2.shape[2], features2.shape[3])
+
+    return l2_dist
+
+
 # Function to compute features for a pair of images
-def compute_pair_feature(model, aug, files, category, mask=False, real_size=960):
+def compute_pair_feature(model, aug, files, category, mask=False, real_size=960, dist = args.similarity_func):
     if type(category) == str:
         category = [category]
     img_size = 840 if DINOV2 else 244
@@ -147,13 +178,13 @@ def compute_pair_feature(model, aug, files, category, mask=False, real_size=960)
                     img2_batch = extractor.preprocess_pil(img2)
                     img2_desc_dino = extractor.extract_descriptors(img2_batch.to(device), layer, facet)
                 
-            # if dist == 'l1' or dist == 'l2':
-            #     # normalize the features
-            #     img1_desc = img1_desc / img1_desc.norm(dim=-1, keepdim=True)
-            #     img2_desc = img2_desc / img2_desc.norm(dim=-1, keepdim=True)
-            #     if FUSE_DINO:
-            #         img1_desc_dino = img1_desc_dino / img1_desc_dino.norm(dim=-1, keepdim=True)
-            #         img2_desc_dino = img2_desc_dino / img2_desc_dino.norm(dim=-1, keepdim=True)
+            if dist == 'l1' or dist == 'l2':
+                # normalize the features
+                img1_desc = img1_desc / img1_desc.norm(dim=-1, keepdim=True)
+                img2_desc = img2_desc / img2_desc.norm(dim=-1, keepdim=True)
+                if FUSE_DINO:
+                    img1_desc_dino = img1_desc_dino / img1_desc_dino.norm(dim=-1, keepdim=True)
+                    img2_desc_dino = img2_desc_dino / img2_desc_dino.norm(dim=-1, keepdim=True)
 
             if FUSE_DINO and not ONLY_DINO:
                 # cat two features together
@@ -176,10 +207,6 @@ files = [src_img_path, trg_img_path]
 # Compute the features for the image pair
 result = compute_pair_feature(model, aug, files, mask=MASK, category=category)
 
-# Clean up the model from GPU to free memory
-del model
-torch.cuda.empty_cache()
-
 # Reshape the features for visualization
 feature1 = result[0][0]
 feature2 = result[0][1]
@@ -190,7 +217,10 @@ src_feature_upsampled = F.interpolate(src_feature_reshaped, size=(RESOLUTION, RE
 tgt_feature_upsampled = F.interpolate(tgt_feature_reshaped, size=(RESOLUTION, RESOLUTION), mode='bilinear')
 
 # Compute volume of cosine similarity
-volume = cosine_similarity(src_feature_upsampled,tgt_feature_upsampled)
+if args.similarity_func == 'cos':
+    volume = cosine_similarity(src_feature_upsampled,tgt_feature_upsampled)
+elif args.similarity_func == 'l2':
+    volume = l2_distance(src_feature_upsampled,tgt_feature_upsampled)
 
 # Load and process source and target images for visualization
 src_img=Image.open(src_img_path).convert('RGB')
@@ -230,14 +260,23 @@ def on_hover(event):
             x, y = int(event.xdata), int(event.ydata)
             
             heatmap = similarity_tensor[y, x, :, :].cpu().numpy()
+
+            # Find the nearest neighbor
+            if args.similarity_func == 'cos':
+                index = np.argmax(heatmap)
+            elif args.similarity_func == 'l2':
+                index = np.argmin(heatmap)
+            x_nn = index // RESOLUTION
+            y_nn = index % RESOLUTION
             
             # Clear the second subplot
-            ax1.clear()
-
+            ax2.clear()
             ax2.imshow(tgt_img.squeeze())  # Display the second image
             ax2.imshow(heatmap, cmap='jet', alpha=0.6)  # Overlay the heatmap
+            ax2.plot(y_nn, x_nn, 'rx', markersize=10)
 
             # Highlight the hovered pixel with a red crosshair
+            ax1.clear()
             ax1.imshow(src_img.squeeze())
             ax1.plot(x, y, 'rx', markersize=10)
             
