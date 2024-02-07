@@ -259,11 +259,16 @@ def pca_process(features):
         # Initialize a Faiss PCA object
         pca = faiss.PCAMatrix(tensor.shape[-1], target_dim)
 
+        array = tensor[0].cpu().numpy()
+
+        # Making the array C-contiguous
+        c_contiguous_array = np.ascontiguousarray(array)
+
         # Train the PCA object
-        pca.train(tensor[0].cpu().numpy())
+        pca.train(c_contiguous_array)
 
         # Apply PCA to the data
-        transformed_tensor_np = pca.apply(tensor[0].cpu().numpy())
+        transformed_tensor_np = pca.apply(c_contiguous_array)
 
         # Convert the transformed data back to a tensor
         transformed_tensor = torch.tensor(transformed_tensor_np, device=tensor.device).unsqueeze(0)
