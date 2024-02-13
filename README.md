@@ -1,4 +1,4 @@
-Use can now use the script 
+Use the script 
 
 ```python  heatmap_vis.py /path/to/src/image /path/to/target/image similarity_func dinov2_size ```
 
@@ -9,10 +9,23 @@ The script uses by default the fused features as they are used in the ```demo_sw
 <div align="center">
 <img src="assets/heatmap_figure_1.png" width="32%">
 <img src="assets/heatmap_figure_2.png" width="32%">
-
 </div>
 
-TODO: make docker image
+
+# Docker image
+
+- Run, in the same directory  as the Dockerfile and docker-compose.yml.
+
+      docker compose build sd-dino
+
+    to build the sd-dino docker image.
+
+- Run, in the same directory
+  
+      docker compose run sd-dino
+
+    to create and run a container from the phoxi_data_collection image.
+
 
 ---
 

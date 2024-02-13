@@ -19,7 +19,6 @@ RUN git clone https://github.com/facebookresearch/detectron2.git
 RUN pip install pycocotools
 RUN pip install cython
 
-# ENV FORCE_CUDA="1"
 RUN pip install -e detectron2
 
 WORKDIR /sd-dino
