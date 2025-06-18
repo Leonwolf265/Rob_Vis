@@ -1,0 +1,21 @@
+# Core
+torch==2.4.1
+numpy>=1.24.4
+Pillow>=10.4.0
+matplotlib>=3.7.5
+
+# 3D / ROS-Pipeline
+open3d>=0.13.0
+opencv-python>=4.11.0
+
+# ViT-Feature-Extraction (DINO)
+timm>=0.9.2
+torchvision>=0.19.1
+
+# Segment Anything Model
+segment-anything>=0.1.0
+transformers>=4.30.0
+tqdm>=4.65.0
+
+# GroundingDINO (linienbasierte Objekt-Lokalisierung)
+git+https://github.com/IDEA-Research/GroundingDINO.git@main#egg=groundingdino
